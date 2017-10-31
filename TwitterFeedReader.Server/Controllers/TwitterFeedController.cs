@@ -16,20 +16,11 @@ namespace TwitterFeedReader.Server.Controllers
     public class TwitterFeedController : ApiController
 
     {
-
         [Route("{count:int}/{userName:alpha}/{filter:alpha?}")]
-
         public async Task<IEnumerable<Tweet>> Get(int count, string userName = "salesforce", string filter = "")
-
         {
-
             var tweets = await TwitterService.GetTweets(userName, count, filter, string.Empty);
-
             return tweets;
-
         }
-
-
-
     }
 }

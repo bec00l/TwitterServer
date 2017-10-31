@@ -13,43 +13,30 @@ namespace TwitterFeedReader.Server.Services
     public static class TwitterService
     {
         private static readonly String OAuthBaseUrl = "https://api.twitter.com/oauth2/token";
-
-
-
         private static readonly String OAuthAPIKey = "zIb9cf1iMIs6jC3ZWa0kwe0Eu";
-
-
-
         private static readonly String OAuthAPISecret = "3jJs8MxpdDzpDg1Vp9iojNNTxirlIZp5sATk3VPfjFDvU1NLhD";
+        private static String UserTimelineBaseUrl = "https://api.twitter.com/1.1/statuses/user_timeline.json?screen_name={0}&count={1}";
 
-
-
-        private static String UserTimelineBaseUrl = "https://api.twitter.com/1.1/statuses/user_timeline.json?count={0}&screen_name={1}&trim_user={2}&exclude_replies={3}";
 
 
         public static async Task<string> GetAccessToken()
-
         {
-
+            const string AUTHORIZATION_STRING = "Authorization";
+            const string ACCESS_TOKEN_STRING = "access_token";
+            const string BASIC_STRING = "Basic ";
+            const string ENCODING_STRING = "application/x-www-form-urlencoded";
+            const string GRANT_TYPE_STRING = "grant_type=client_credentials";
+            const string SEPARATOR_STRING = ":";
             using (HttpClient httpClient = new HttpClient())
-
             {
-
                 using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, OAuthBaseUrl))
-
                 {
 
-                    var customerInfo = Convert.ToBase64String(new UTF8Encoding()
+                    var customerInfo = Convert.ToBase64String(new UTF8Encoding().GetBytes(OAuthAPIKey + SEPARATOR_STRING + OAuthAPISecret));
 
-                                         .GetBytes(OAuthAPIKey + ":" + OAuthAPISecret));
+                    request.Headers.Add(AUTHORIZATION_STRING, BASIC_STRING + customerInfo);
 
-                    request.Headers.Add("Authorization", "Basic " + customerInfo);
-
-                    request.Content = new StringContent("grant_type=client_credentials", Encoding.UTF8,
-
-                                                                              "application/x-www-form-urlencoded");
-
-
+                    request.Content = new StringContent(GRANT_TYPE_STRING, Encoding.UTF8, ENCODING_STRING);
 
                     HttpResponseMessage response = await httpClient.SendAsync(request);
 
@@ -57,12 +44,8 @@ namespace TwitterFeedReader.Server.Services
 
                     dynamic parsedResponse = new JavaScriptSerializer().Deserialize<object>(jsonResponseMessage);
 
-                    return parsedResponse["access_token"];
-
+                    return parsedResponse[ACCESS_TOKEN_STRING];
                 }
-
-
-
             }
 
         }
@@ -70,76 +53,51 @@ namespace TwitterFeedReader.Server.Services
 
 
         public static async Task<IEnumerable<Tweet>> GetTweets(string userName, int count, string filter = null, string accessToken = null)
-
         {
+            const string AUTHORIZATION_STRING = "Authorization";
+            const string TEXT_STRING = "text";
+            const string USER_STRING = "user";
+            const string NAME_STRING = "name";
+            const string SCREENNAME_STRING = "screen_name";
+            const string ID_STRING = "id";
+            const string BEARER_STRING = "Bearer ";
 
             if (String.IsNullOrWhiteSpace(accessToken))
-
             {
-
                 accessToken = await GetAccessToken();
-
             }
-
-
-
             using (HttpClient httpClient = new HttpClient())
-
             {
-                using (HttpRequestMessage requestUserTimeline = new HttpRequestMessage(HttpMethod.Get, string.Format(UserTimelineBaseUrl, count, userName, 0, 1)))
-
+                using (HttpRequestMessage requestUserTimeline = new HttpRequestMessage(HttpMethod.Get, string.Format(UserTimelineBaseUrl, userName, count)))
                 {
-
-
-
-                    requestUserTimeline.Headers.Add("Authorization", "Bearer " + accessToken);
-
-
+                    requestUserTimeline.Headers.Add(AUTHORIZATION_STRING, BEARER_STRING + accessToken);
 
                     HttpResponseMessage responseUserTimeLine = await httpClient.SendAsync(requestUserTimeline);
 
-
-
                     dynamic jsonResponse = new JavaScriptSerializer().Deserialize<object>(await responseUserTimeLine.Content.ReadAsStringAsync());
-
-
 
                     var tweetCollection = (jsonResponse as IEnumerable<dynamic>);
 
-
-
                     if (tweetCollection == null)
-
                     {
-
                         return null;
-
                     }
 
                     if (!String.IsNullOrWhiteSpace(filter))
-
                     {
-
-                        tweetCollection = tweetCollection.Where(t => t["text"] != null && t["text"].ToString().Contains(filter));
-
+                        tweetCollection = tweetCollection.Where(t => t[TEXT_STRING] != null && t[TEXT_STRING].ToString().Contains(filter));
                     }
 
                     return tweetCollection.Select(t => new Tweet()
-
                     {
                         User = new User()
                         {
-                            Name = t["user"]["name"],
-                            Handle = t["user"]["screen_name"],
-                            ProfileImage = t["user"]["profile_image_url"]
+                            Name = t[USER_STRING][NAME_STRING],
+                            Handle = t[USER_STRING][SCREENNAME_STRING]
                         },
-                        TweetId = t["id"]
+                        TweetId = t[ID_STRING]
                     });
-
                 }
-
-
-
             }
         }
     }
